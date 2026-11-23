@@ -1,6 +1,6 @@
 // Service worker: appka funguje offline.
 // Pri každej zmene súborov zvýš číslo verzie nižšie, aby si telefón stiahol nové súbory.
-const VERZIA = 'trening-v1';
+const VERZIA = 'trening-v2';
 const SUBORY = ['./', 'index.html', 'style.css', 'app.js', 'blok1_plan.json',
   'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 

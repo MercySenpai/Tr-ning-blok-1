@@ -166,44 +166,60 @@ function dnesnyIndex() {
   return d < plan.weeks[0].days[0].date ? [0, 0] : [plan.weeks.length - 1, 6]; // mimo plánu
 }
 
+// Hotový cvik = všetky jeho série odškrtnuté
+const hotovyCvik = (day, ex) => { const z = data.log[kl(day.date, ex.id)]; return !!z && z.sets.length >= ex.sets && z.sets.every(s => s.d); };
+
 function kresliHome() {
-  const w = plan.weeks[stav.week], day = w.days[stav.day];
+  const y = scrollY, w = plan.weeks[stav.week], day = w.days[stav.day];
+  const hot = day.exercises.filter(e => hotovyCvik(day, e)).length, n = day.exercises.length;
   let html = '';
-  if (!data.seen) html += `<div class="warn">⚠️ Tvoje zápisy sú uložené <b>len v tomto mobile</b> (v prehliadači). Pravidelne rob zálohu: Dáta → Export.<br><button id="rozumiem" class="big on">Rozumiem</button></div>`;
-  html += `<div class="row">${plan.weeks.map((x, i) => `<button data-w="${i}" class="${i === stav.week ? 'on' : ''}">T${x.week}</button>`).join('')}</div>`;
-  html += `<div class="row">${w.days.map((x, i) => `<button data-d="${i}" class="${i === stav.day ? 'on' : ''}">${DNI[i]}<br>${stavDna(x)}</button>`).join('')}</div>`;
-  html += `<div class="dim">${h(w.phase)} · ${h(w.note)}</div>`;
-  html += `<h2>${h(day.weekday)} ${datSk(day.date)} – ${h(day.title)}</h2><div class="dim">${h(day.timeHint)}</div>`;
+  if (!data.seen) html += `<div class="warn">⚠️ Tvoje zápisy sú uložené <b>len v tomto mobile</b>. Pravidelne rob zálohu: Dáta → Export.<br><button id="rozumiem" class="big on">Rozumiem</button></div>`;
+  html += `<div class="dayhd"><button data-krok="-1">‹</button><div><div class="dim">${h(day.weekday)} ${datSk(day.date)} · týždeň ${w.week}</div>
+    <h2>${h(day.title)}</h2></div><button data-krok="1">›</button></div>
+    <div class="bar"><i style="width:${n ? hot / n * 100 : 0}%"></i></div>
+    <div class="dim">${hot} z ${n} cvikov hotových${day.timeHint && day.timeHint !== '—' ? ' · ' + h(day.timeHint) : ''}</div>`;
+  const cur = day.exercises.find(e => !hotovyCvik(day, e));
   let prev = null;
   for (const ex of day.exercises) {
     const ss = ex.supersetGroup;
     if (ss && ss !== prev) html += `<div class="sstag">Superséria ${h(ss)} – striedaj</div>`;
     prev = ss;
-    html += kartaHtml(ex, day);
+    html += kartaHtml(ex, day, ex === cur);
   }
   $('#main').innerHTML = html;
+  scrollTo(0, y);
   const r = $('#rozumiem'); if (r) r.onclick = () => { data.seen = true; ulozit(); kresliHome(); };
 }
 
-function kartaHtml(ex, day) {
+// Záložka Týždeň: výber týždňa a dňa
+function kresliTyzden() {
+  const w = plan.weeks[stav.week];
+  let html = '<h2>Týždeň</h2><div class="row">' + plan.weeks.map((x, i) =>
+    `<button data-w="${i}" class="${i === stav.week ? 'on' : ''}">T${x.week}</button>`).join('') + '</div>';
+  html += `<div class="dim">${h(w.phase)} · ${h(w.note)}</div>`;
+  html += w.days.map((x, i) => `<button class="wk${i === stav.day ? ' sel' : ''}" data-d="${i}"><b>${DNI[i]}</b>
+    <span>${h(x.title)}<span class="dim">${datSk(x.date)}</span></span><span>${stavDna(x)}</span></button>`).join('');
+  $('#main').innerHTML = html;
+}
+
+function kartaHtml(ex, day, cur) {
   const open = stav.open.has(ex.id);
   const z = data.log[kl(day.date, ex.id)];
   const hotove = z ? z.sets.filter(s => s.d).length : 0;
-  const chips = [
-    `<span>${ex.sets} × ${h(ex.reps)}</span>`,
-    planVaha(ex) && `<span class="plan">${h(planVaha(ex))}</span>`,
-    ex.targetRIR && `<span>RIR ${h(ex.targetRIR)}</span>`,
-    ex.tempo && `<span>tempo ${h(ex.tempo)}</span>`,
-    ex.restText && ex.restText !== '—' && `<span>pauza ${h(ex.restText)}</span>`
-  ].filter(Boolean).join('');
-  let b = `<div class="card${ex.supersetGroup ? ' ss' : ''}${open ? ' open' : ''}" data-id="${h(ex.id)}">
-    <div class="hd"><div><span class="lab">${h(ex.label)}</span><span class="name">${h(ex.name)}</span></div>
-    <div>${hotove ? `${hotove}/${ex.sets} ✓` : ''}</div></div>
-    <div class="chips">${chips}</div>`;
+  const hotovy = hotovyCvik(day, ex);
+  const popis = [`${ex.sets} × ${h(ex.reps)}`, planVaha(ex) && `<span class="plan">${h(planVaha(ex))}</span>`,
+    ex.targetRIR && `RIR ${h(ex.targetRIR)}`].filter(Boolean).join(' · ');
+  const chips = [ex.tempo && `tempo ${h(ex.tempo)}`, ex.restText && ex.restText !== '—' && `pauza ${h(ex.restText)}`]
+    .filter(Boolean).map(c => `<span>${c}</span>`).join('');
+  let b = `<div class="card${ex.supersetGroup ? ' ss' : ''}${cur ? ' cur' : ''}${hotovy ? ' done' : ''}" data-id="${h(ex.id)}">
+    <div class="hd"><span class="chk">${hotovy ? '✓' : ''}</span>
+    <div><span class="lab">${h(ex.label)}</span><span class="name">${h(ex.name)}</span><div class="sub">${popis}</div></div>
+    <div class="dim">${hotove && !hotovy ? hotove + '/' + ex.sets : ''}</div></div>`;
   if (ex.note) b += `<div class="dim">ℹ️ ${h(ex.note)}</div>`;
   if (open) {
     const zz = zaznam(day.date, ex), f = polia(ex), m = minule(ex, day.date);
     if (m) b += `<div class="past">Minule (${datSk(m.d)}): ${m.z.sets.filter(s => s.d).map(s => popisSerie(ex, s)).join(' · ')}${m.z.note ? '<br>📝 ' + h(m.z.note) : ''}</div>`;
+    if (chips) b += `<div class="chips">${chips}</div>`;
     b += zz.sets.map((s, i) => `<div class="set" data-i="${i}"><span class="n">${i + 1}.</span>${f.map(([k, u]) =>
       `<div><small>${u}</small><input inputmode="decimal" data-k="${k}" value="${h(s[k] ?? '')}"></div>`).join('')}
       ${!f.length ? '<div class="dim" style="text-align:center;padding-bottom:14px">hotovo?</div>' : ''}
@@ -218,14 +234,21 @@ function kartaHtml(ex, day) {
 
 // ---------- Udalosti na domovskej obrazovke (jeden poslucháč pre všetko) ----------
 document.addEventListener('click', e => {
+  const w = e.target.closest('[data-w]'), d = e.target.closest('[data-d]'), k = e.target.closest('[data-krok]');
+  if (stav.view === 'tyzden') {
+    if (w) { stav.week = +w.dataset.w; return kresli(); }
+    if (d) { stav.day = +d.dataset.d; stav.view = 'home'; kresli(); return scrollTo(0, 0); }
+  }
   if (stav.view !== 'home') return;
-  const w = e.target.closest('[data-w]'), d = e.target.closest('[data-d]');
-  if (w) { stav.week = +w.dataset.w; return kresliHome(); }
-  if (d) { stav.day = +d.dataset.d; return kresliHome(); }
+  if (k) { // šípky ‹ › = predošlý / ďalší deň (cez hranice týždňov)
+    let i = stav.week * 7 + stav.day + +k.dataset.krok;
+    i = Math.max(0, Math.min(plan.weeks.length * 7 - 1, i));
+    stav.week = Math.floor(i / 7); stav.day = i % 7; kresliHome(); return scrollTo(0, 0);
+  }
   const card = e.target.closest('.card'); if (!card) return;
   const day = plan.weeks[stav.week].days[stav.day];
   const ex = day.exercises.find(x => x.id === card.dataset.id);
-  const obnov = () => { card.outerHTML = kartaHtml(ex, day); };
+  const obnov = kresliHome; // prekreslí celý deň (zachová pozíciu rolovania)
   if (e.target.closest('details')) return;
   if (e.target.closest('.hd')) { stav.open.has(ex.id) ? stav.open.delete(ex.id) : stav.open.add(ex.id); return obnov(); }
   const z = zaznam(day.date, ex);
@@ -234,7 +257,7 @@ document.addEventListener('click', e => {
     const s = z.sets[+e.target.closest('.set').dataset.i];
     s.d = !s.d; ulozit();
     if (s.d && ex.restSec > 0) spustPauzu(ex.restSec); // po uložení série sa spustí pauza
-    obnov(); kresliStavDna();
+    kresliHome(); // prekreslí postup aj zvýraznenie aktuálneho cviku
   }
   if (e.target.matches('[data-plus]')) { z.sets.push({ ...(z.sets.at(-1) || predvyplnenie(ex)), d: false }); ulozit(); obnov(); }
 });
@@ -248,10 +271,6 @@ document.addEventListener('input', e => {
   else if (e.target.dataset.k) z.sets[+e.target.closest('.set').dataset.i][e.target.dataset.k] = e.target.value;
   ulozit();
 });
-function kresliStavDna() { // len prepíše ikony dní, aby sa nestratil rozpísaný text
-  document.querySelectorAll('[data-d]').forEach(b => { const i = +b.dataset.d; b.innerHTML = `${DNI[i]}<br>${stavDna(plan.weeks[stav.week].days[i])}`; });
-}
-
 // =====================================================================
 //  PREHĽAD – hlavné cviky, plán vs. realita, e1RM, telesné miery
 // =====================================================================
@@ -349,8 +368,8 @@ async function stiahni(meno, obsah, typ) {
 //  Štart
 // =====================================================================
 function kresli() {
-  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.v === stav.view));
-  ({ home: kresliHome, prehlad: kresliPrehlad, data: kresliData })[stav.view]();
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.v === stav.view));
+  ({ home: kresliHome, tyzden: kresliTyzden, prehlad: kresliPrehlad, data: kresliData })[stav.view]();
 }
 $('#nav').onclick = e => { if (e.target.dataset.v) { stav.view = e.target.dataset.v; kresli(); scrollTo(0, 0); } };
 
