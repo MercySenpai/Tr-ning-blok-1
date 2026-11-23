@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121212">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tréning">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+<title>Tréning</title>
+</head>
+<body>
+<header>
+  <nav id="nav">
+    <button data-v="home">Domov</button>
+    <button data-v="prehlad">Prehľad</button>
+    <button data-v="data">Dáta</button>
+  </nav>
+</header>
+<main id="main"></main>
+
+<!-- Časovač pauzy: vždy viditeľný dole -->
+<div id="timer"></div>
+<div id="toast" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>
