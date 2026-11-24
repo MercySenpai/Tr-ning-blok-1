@@ -1,9 +1,9 @@
 // Service worker: appka funguje offline.
 // Pri každej zmene súborov zvýš číslo verzie nižšie, aby si telefón stiahol nové súbory.
 // (Nový plan.json sa načíta aj bez toho – súbory sa ťahajú najprv zo siete.)
-const VERZIA = 'trening-v4';
+const VERZIA = 'trening-v5';
 const SUBORY = ['./', 'index.html', 'style.css', 'app.js', 'plan.json',
-  'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+  'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERZIA).then(c => c.addAll(SUBORY)).then(() => self.skipWaiting()));

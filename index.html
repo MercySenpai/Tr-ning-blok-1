@@ -9,9 +9,14 @@
 <meta name="apple-mobile-web-app-title" content="Tréning">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png">
 <link rel="stylesheet" href="style.css">
+<script>
+  // tmavý režim nastav hneď, aby obrazovka pri štarte nezablikala nabielo
+  try { const t = (JSON.parse(localStorage.getItem('trening_data')) || {}).tema;
+    if (t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.dataset.tema = 'dark'; } catch (e) { }
+</script>
 <title>Tréning</title>
 </head>
 <body>

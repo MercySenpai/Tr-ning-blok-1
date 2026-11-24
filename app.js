@@ -16,12 +16,13 @@ let plan = null;                    // aktívny plán
 // data.body["2026-11-23"] = { kg, waist }   (kľúč = pondelok týždňa)
 // data.cas["2026-11-23"] = { start, end }    (čas prvej a poslednej série dňa)
 let data = JSON.parse(localStorage.getItem(KLUC) || 'null') || {};
-data = { log: {}, body: {}, cas: {}, seen: false, lastExport: null, backTap: false, ...data };
+data = { log: {}, body: {}, cas: {}, seen: false, lastExport: null, backTap: false, tema: 'light', ...data };
+// data.tema = 'light' | 'dark' | 'auto' (podľa nastavenia mobilu)
 // data.backTap = true → po sérii sa dĺžka pauzy skopíruje do schránky pre skratku „Pauza“ (ťuk na zadnú stranu iPhonu)
 const ulozit = () => localStorage.setItem(KLUC, JSON.stringify(data));
 let plany = JSON.parse(localStorage.getItem(KLUC_PLANY) || '{}');
 
-const stav = { view: 'trening', week: 0, day: 0, exId: null, pokrok: 'sila', pokrokBlok: null, restOpen: true };
+const stav = { planOpen: null, view: 'trening', week: 0, day: 0, exId: null, pokrok: 'sila', pokrokBlok: null, restOpen: true };
 const $ = s => document.querySelector(s);
 // ochrana pred vložením HTML z textov
 const h = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -216,6 +217,16 @@ $('#rest').addEventListener('click', e => {
 });
 $('#pill').onclick = () => { stav.restOpen = true; kresliT(); };
 
+// ---------- Vzhľad: svetlý / tmavý / podľa mobilu ----------
+const tmaveSystem = window.matchMedia('(prefers-color-scheme: dark)');
+function nastavTemu() {
+  const tmava = data.tema === 'dark' || (data.tema === 'auto' && tmaveSystem.matches);
+  document.documentElement.dataset.tema = tmava ? 'dark' : 'light';
+  document.querySelector('meta[name=theme-color]').content = tmava ? '#0f0e12' : '#fafafa';
+}
+tmaveSystem.addEventListener?.('change', nastavTemu);
+nastavTemu();
+
 function toast(msg) { const e = $('#toast'); e.textContent = msg; e.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => e.hidden = true, 3000); }
 
 // =====================================================================
@@ -320,8 +331,9 @@ document.addEventListener('click', e => {
   if (!plan) return;
   const el = sel => e.target.closest(sel);
   if (stav.view === 'plan') {
-    if (el('[data-w]')) { stav.week = +el('[data-w]').dataset.w; return kresliPlan(); }
-    if (el('[data-d]')) { stav.day = +el('[data-d]').dataset.d; stav.exId = null; return prepni('trening'); }
+    if (el('[data-w]')) { stav.week = +el('[data-w]').dataset.w; stav.planOpen = null; return kresliPlan(); }
+    if (el('[data-open]')) { stav.day = +el('[data-open]').dataset.open; stav.exId = null; return prepni('trening'); }
+    if (el('[data-d]')) { const i = +el('[data-d]').dataset.d; stav.planOpen = stav.planOpen === i ? null : i; return kresliPlan(); }
   }
   if (stav.view === 'pokrok') {
     if (el('[data-pk]')) { stav.pokrok = el('[data-pk]').dataset.pk; return kresliPokrok(); }
@@ -373,13 +385,25 @@ function kresliPlan() {
     <div class="dim"><b style="color:var(--text)">${h(w.phase)}</b> · ${datSk(w.startDate)}–${datSk(w.endDate)}<br>${h(w.note)}</div>`;
   html += w.days.map((x, i) => {
     const s = stavDna(x);
-    return `<button class="day${x.date === d0 ? ' today' : ''}" data-d="${i}"><span class="wd t-${h(x.type)}">${DNI[i]}</span>
+    return `<button class="day${x.date === d0 ? ' today' : ''}${stav.planOpen === i ? ' open' : ''}" data-d="${i}"><span class="wd t-${h(x.type)}">${DNI[i]}</span>
       <span>${h(x.title)}<span class="dim">${datSk(x.date)}${x.timeHint && x.timeHint !== '—' ? ' · ' + h(x.timeHint) : ''}</span></span>
-      <span class="badge ${s}">${{ none: '–', half: 'rozpracované', full: 'hotovo' }[s]}</span></button>`;
+      <span class="badge ${s}">${{ none: '–', half: 'rozpracované', full: 'hotovo' }[s]}</span></button>${stav.planOpen === i ? zoznamDna(x, i) : ''}`;
   }).join('');
   if (plan.meta.rules?.length) html += `<details open><summary>📋 Pravidlá bloku</summary><div><ul class="rules">${plan.meta.rules.map(r => `<li>${h(r)}</li>`).join('')}</ul></div></details>`;
   if (plan.meta.heartRate) html += `<details><summary>❤️ Tepové zóny</summary><div>${Object.entries(plan.meta.heartRate).map(([k, v]) => `${k === 'zone2' ? 'Zóna 2' : k === 'intervals' ? 'Intervaly' : h(k)}: <b>${h(v)}</b>`).join('<br>')}</div></details>`;
   $('#main').innerHTML = html;
+}
+
+// Rozbalený deň v Pláne: zoznam cvikov s plánom (bez otvárania tréningu)
+function zoznamDna(day, i) {
+  if (!day.exercises.length) return '<div class="dayx dim">Voľno – bez cvikov.</div>';
+  let prev = null;
+  return '<div class="dayx">' + day.exercises.map(ex => {
+    const ss = ex.supersetGroup && ex.supersetGroup !== prev ? `<div class="ss">Superséria ${h(ex.supersetGroup)} – striedaj</div>` : '';
+    prev = ex.supersetGroup;
+    const det = [`${ex.sets} × ${h(ex.reps)}`, h(planVaha(ex)), ex.targetRIR && 'RIR ' + h(ex.targetRIR), ex.restText && ex.restText !== '—' && 'pauza ' + h(ex.restText)].filter(Boolean).join(' · ');
+    return `${ss}<div class="li"><b>${h(ex.label)}</b><span>${h(ex.name)}<small>${det}</small></span>${hotovyCvik(day, ex) ? '<i>✓</i>' : ''}</div>`;
+  }).join('') + `<button class="btn-p" data-open="${i}">Otvoriť tréning ›</button></div>`;
 }
 
 // =====================================================================
@@ -400,10 +424,10 @@ function graf(real, planH) {
   const ciara = (arr, st) => { const p = arr.map((v, i) => v == null ? null : `${X(i)},${Y(v)}`).filter(Boolean);
     return p.length > 1 ? `<polyline points="${p.join(' ')}" fill="none" ${st}/>` : ''; };
   return `<svg class="chart" viewBox="0 0 320 96" preserveAspectRatio="none">
-    <line x1="0" y1="90" x2="320" y2="90" stroke="#f1f1f3"/>
-    ${ciara(planH, 'stroke="#d4d4d8" stroke-width="2" stroke-dasharray="5 5"')}
-    ${ciara(real, 'stroke="#5b2a86" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"')}
-    ${real.map((v, i) => v == null ? '' : `<circle cx="${X(i)}" cy="${Y(v)}" r="5" fill="#5b2a86"/>`).join('')}</svg>`;
+    <line x1="0" y1="90" x2="320" y2="90" style="stroke:var(--line)"/>
+    ${ciara(planH, 'style="stroke:var(--faint)" stroke-width="2" stroke-dasharray="5 5"')}
+    ${ciara(real, 'style="stroke:var(--p)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"')}
+    ${real.map((v, i) => v == null ? '' : `<circle cx="${X(i)}" cy="${Y(v)}" r="5" style="fill:var(--p)"/>`).join('')}</svg>`;
 }
 
 function kresliPokrok() {
@@ -501,6 +525,8 @@ async function kresliZaloha() {
     <button class="big-btn" id="exC">📊<span>Export pre trénera (CSV)<small>všetky série zo všetkých blokov, otvorí sa v Exceli</small></span></button>
     <button class="big-btn" id="imp">⬆️<span>Obnoviť zo zálohy<small>zlúči zálohu so zápismi v mobile</small></span></button>
     <input type="file" id="file" accept=".json,application/json" hidden>
+    <h3>Vzhľad</h3>
+    <div class="seg" id="tema">${[['light', '☀️ Svetlý'], ['dark', '🌙 Tmavý'], ['auto', 'Podľa mobilu']].map(([k, v]) => `<button data-tema="${k}" class="${data.tema === k ? 'on' : ''}">${v}</button>`).join('')}</div>
     <h3>Časovač na zamknutej obrazovke</h3>
     <button class="big-btn" id="bt">${data.backTap ? '✅' : '⬜️'}<span>Pauza cez iPhone (ťuk na zadnú stranu)<small>${data.backTap ? 'zapnuté – po sérii sa pauza skopíruje do schránky' : 'vypnuté'}</small></span></button>
     <h3>Plán</h3><div class="card"><b>${h(plan.meta.title)}</b><div class="dim">verzia ${h(plan.meta.version)} · ${datSk(plan.meta.startDate)}–${datSk(plan.meta.endDate)}</div>
@@ -511,6 +537,7 @@ async function kresliZaloha() {
       log: data.log, body: data.body, cas: data.cas, plany }, null, 1), 'application/json');
     data.lastExport = Date.now(); ulozit(); kresliZaloha();
   };
+  $('#tema').onclick = e => { const k = e.target.closest('[data-tema]')?.dataset.tema; if (k) { data.tema = k; ulozit(); nastavTemu(); kresliZaloha(); } };
   $('#bt').onclick = () => { data.backTap = !data.backTap; ulozit(); kresliZaloha(); };
   $('#exC').onclick = () => stiahni(`trening_${dnes()}.csv`, '﻿' + csv(), 'text/csv');
   $('#imp').onclick = () => $('#file').click();
