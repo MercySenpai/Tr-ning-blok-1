@@ -1,7 +1,8 @@
 // Service worker: appka funguje offline.
 // Pri každej zmene súborov zvýš číslo verzie nižšie, aby si telefón stiahol nové súbory.
-const VERZIA = 'trening-v2';
-const SUBORY = ['./', 'index.html', 'style.css', 'app.js', 'blok1_plan.json',
+// (Nový plan.json sa načíta aj bez toho – súbory sa ťahajú najprv zo siete.)
+const VERZIA = 'trening-v4';
+const SUBORY = ['./', 'index.html', 'style.css', 'app.js', 'plan.json',
   'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
